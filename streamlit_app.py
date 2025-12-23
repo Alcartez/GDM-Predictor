@@ -28,6 +28,7 @@ st.markdown("""
         border-radius: 0.5rem;
         margin: 1rem 0;
         border-left: 4px solid;
+        color: #000000; /* Ensure text is dark on light background */
     }
     .high-risk {
         background-color: #ffebee;
@@ -40,6 +41,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+from sklearn.pipeline import Pipeline
+
 @st.cache_resource
 def load_model():
     """Load the trained model and preprocessing objects"""
@@ -49,7 +52,19 @@ def load_model():
         models_dir = os.path.join(current_dir, 'models')
         
         # Load model files using paths relative to the script
-        model = joblib.load(os.path.join(models_dir, 'best_lazy_model_LGBMClassifier.joblib'))
+        model_container = joblib.load(os.path.join(models_dir, 'best_lazy_model_LGBMClassifier.joblib'))
+        
+        # Extract classifier if it's a pipeline
+        if isinstance(model_container, Pipeline):
+            # Check for 'classifier' step name first (LazyPredict standard)
+            if 'classifier' in model_container.named_steps:
+                model = model_container.named_steps['classifier']
+            else:
+                # Fallback to last step
+                model = model_container.steps[-1][1]
+        else:
+            model = model_container
+
         scaler = joblib.load(os.path.join(models_dir, 'scaler.joblib'))
         feature_names = joblib.load(os.path.join(models_dir, 'feature_names.joblib'))
         knn_imputer = joblib.load(os.path.join(models_dir, 'knn_imputer.joblib'))
@@ -163,7 +178,7 @@ def main():
                 sys_bp = st.number_input("Systolic BP", 70, 180, 105)
                 dia_bp = st.number_input("Diastolic BP", 40, 120, 70)
             
-            submitted = st.form_submit_button("🔮 Predict Risk", use_container_width=True)
+            submitted = st.form_submit_button("🔮 Predict Risk")
             
             if submitted:
                 input_data = {
